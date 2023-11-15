@@ -14,6 +14,7 @@ from src.segment_anything import build_sam_vit_b, SamPredictor
 from src.lora import LoRA_sam
 import matplotlib.pyplot as plt
 import yaml
+import json 
 import torch.nn.functional as F
 """
 This file is used to train a LoRA_sam model. I use that monai DiceLoss for the training. The batch size and number of epochs are taken from the configuration file.
@@ -23,6 +24,12 @@ The model is saved at the end as a safetensor.
 # Load the config file
 with open("./config.yaml", "r") as ymlfile:
    config_file = yaml.load(ymlfile, Loader=yaml.Loader)
+   ymlfile.close()
+
+# Load the annotations file
+with open("./annotations.json", "r") as jsonfile:
+    annotations = json.load(jsonfile)
+    jsonfile.close()
 
 # Take dataset path
 train_dataset_path = config_file["DATASET"]["TRAIN_PATH"]
@@ -33,7 +40,7 @@ sam_lora = LoRA_sam(sam, config_file["SAM"]["RANK"])
 model = sam_lora.sam
 # Process the dataset
 processor = Samprocessor(model)
-train_ds = DatasetSegmentation(config_file, processor, mode="train")
+train_ds = DatasetSegmentation(annotations, processor, mode="train")
 # Create a dataloader
 train_dataloader = DataLoader(train_ds, batch_size=config_file["TRAIN"]["BATCH_SIZE"], shuffle=True, collate_fn=collate_fn)
 # Initialize optimize and Loss

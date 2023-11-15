@@ -32,20 +32,12 @@ class DatasetSegmentation(Dataset):
             ground_truth_mask: Ground truth mask
     """
 
-    def __init__(self, config_file: dict, processor: Samprocessor, mode: str):
-        super().__init__()
-        if mode == "train":
-            self.img_files = glob.glob(os.path.join(config_file["DATASET"]["TRAIN_PATH"],'images','*.jpg'))
-            self.mask_files = []
-            for img_path in self.img_files:
-                self.mask_files.append(os.path.join(config_file["DATASET"]["TRAIN_PATH"],'masks', os.path.basename(img_path)[:-4] + ".jpg")) 
-
-        else:
-            self.img_files = glob.glob(os.path.join(config_file["DATASET"]["TEST_PATH"],'images','*.jpg'))
-            self.mask_files = []
-            for img_path in self.img_files:
-                self.mask_files.append(os.path.join(config_file["DATASET"]["TEST_PATH"],'masks', os.path.basename(img_path)[:-4] + ".jpg"))
-
+    def __init__(self, annotations: dict, processor: Samprocessor, mode: str):
+        super().__init__()        
+        self.img_files, self.mask_files = [], []
+        for img_path, value in annotations[mode].items():
+            self.img_files.append(img_path)
+            self.mask_files.append(value["mask_path"])
 
         self.processor = processor
 
