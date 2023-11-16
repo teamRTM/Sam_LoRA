@@ -4,7 +4,16 @@ DATASET:
 
 SAM:
   CHECKPOINT: "../sam_weights/sam_vit_b_01ec64.pth"
-  RANK: 512
+  RANKS: 
+    - 4
+    - 8
+    - 16
+    - 64
+    - 128
+    - 256
+    - 512
+    - 1024
+
 TRAIN:
   BATCH_SIZE: 1
   NUM_EPOCHS: 10

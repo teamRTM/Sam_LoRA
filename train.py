@@ -41,65 +41,74 @@ with open("../anomalib/src/anomalib/models/patchcore/config.yaml", "r") as ymlfi
 # Take dataset path
 train_dataset_path = config_file["DATASET"]["TRAIN_PATH"]
 
-# Load SAM model
-sam = build_sam_vit_b(checkpoint=config_file["SAM"]["CHECKPOINT"])
+# Get ranks from config file
+ranks = config_file["SAM"]["RANKS"]
 
-# Create SAM LoRA
-sam_lora = LoRA_sam(sam, config_file["SAM"]["RANK"])
-model = sam_lora.sam
+# Main Loop
+for rank in ranks:
+    print(f"Rank {rank} training...")
+    # Load SAM model
+    sam = build_sam_vit_b(checkpoint=config_file["SAM"]["CHECKPOINT"])
 
-# Process the dataset
-processor = Samprocessor(model)
-train_ds = DatasetSegmentation(annotations, processor, mode="train")
+    # Create SAM LoRA
+    sam_lora = LoRA_sam(sam, rank)
+    model = sam_lora.sam
 
-# Create a dataloader
-train_dataloader = DataLoader(
-    train_ds,
-    batch_size=config_file["TRAIN"]["BATCH_SIZE"],
-    shuffle=True,
-    collate_fn=collate_fn,
-)
+    # Process the dataset
+    processor = Samprocessor(model)
+    train_ds = DatasetSegmentation(annotations, processor, mode="train")
 
-# Initialize optimize and Loss
-optimizer = Adam(model.image_encoder.parameters(), lr=1e-4, weight_decay=0)
-seg_loss = monai.losses.DiceCELoss(sigmoid=True, squared_pred=True, reduction="mean")
-num_epochs = config_file["TRAIN"]["NUM_EPOCHS"]
+    # Create a dataloader
+    train_dataloader = DataLoader(
+        train_ds,
+        batch_size=config_file["TRAIN"]["BATCH_SIZE"],
+        shuffle=True,
+        collate_fn=collate_fn,
+    )
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Initialize optimize and Loss
+    optimizer = Adam(model.image_encoder.parameters(), lr=1e-4, weight_decay=0)
+    seg_loss = monai.losses.DiceCELoss(
+        sigmoid=True, squared_pred=True, reduction="mean"
+    )
+    num_epochs = config_file["TRAIN"]["NUM_EPOCHS"]
 
-# Set model to train and into the device
-model.train()
-model.to(device)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
-total_loss = []
+    # Set model to train and into the device
+    model.train()
+    model.to(device)
 
-for epoch in range(num_epochs):
-    epoch_losses = []
+    total_loss = []
 
-    for i, batch in enumerate(tqdm(train_dataloader)):
-        outputs = model(batched_input=batch, multimask_output=False)
+    for epoch in range(num_epochs):
+        epoch_losses = []
 
-        stk_gt, stk_out = utils.stacking_batch(batch, outputs)
-        stk_out = stk_out.squeeze(1)
-        stk_gt = stk_gt.unsqueeze(
-            1
-        )  # We need to get the [B, C, H, W] starting from [H, W]
-        loss = seg_loss(stk_out, stk_gt.float().to(device))
+        for i, batch in enumerate(tqdm(train_dataloader)):
+            outputs = model(batched_input=batch, multimask_output=False)
 
-        optimizer.zero_grad()
-        loss.backward()
+            stk_gt, stk_out = utils.stacking_batch(batch, outputs)
+            stk_out = stk_out.squeeze(1)
+            stk_gt = stk_gt.unsqueeze(
+                1
+            )  # We need to get the [B, C, H, W] starting from [H, W]
+            loss = seg_loss(stk_out, stk_gt.float().to(device))
 
-        # optimize
-        optimizer.step()
-        epoch_losses.append(loss.item())
+            optimizer.zero_grad()
+            loss.backward()
 
-    print(f"EPOCH: {epoch}")
-    print(f"Mean loss training: {mean(epoch_losses)}")
+            # optimize
+            optimizer.step()
+            epoch_losses.append(loss.item())
 
-# Save the parameters of the model in safetensors format
-dst = Path("../results/sam_lora_results")
-dst.mkdir(exist_ok=True, parents=True)
+        print(f"EPOCH: {epoch}")
+        print(f"Mean loss training: {mean(epoch_losses)}")
 
-rank = config_file["SAM"]["RANK"]
-weight_name = f"mvtec_{anomalib_config['dataset']['category']}_rank{rank}.saftetensors"
-sam_lora.save_lora_parameters(str(dst / weight_name))
+    # Save the parameters of the model in safetensors format
+    dst = Path("../results/sam_lora_weights")
+    dst.mkdir(exist_ok=True, parents=True)
+
+    weight_name = (
+        f"mvtec_{anomalib_config['dataset']['category']}_rank{rank}.safetensors"
+    )
+    sam_lora.save_lora_parameters(str(dst / weight_name))
