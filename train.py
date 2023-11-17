@@ -56,7 +56,7 @@ for rank in ranks:
 
     # Process the dataset
     processor = Samprocessor(model)
-    train_ds = DatasetSegmentation(annotations, processor, mode="train")
+    train_ds = DatasetSegmentation(annotations, processor, mode="train", gt_ratio=0.1)
 
     # Create a dataloader
     train_dataloader = DataLoader(

@@ -131,7 +131,7 @@ for image_name, dict_annot in train_set.items():
         image_name,
         save_path,
         rank=4,
-        mask_path=dict_annot["mask_path"],
+        mask_path=dict_annot["gt_path"],
         bbox=dict_annot["bbox"],
         is_baseline=True,
     )
@@ -146,7 +146,7 @@ for image_name, dict_annot in test_set.items():
         image_name,
         save_path,
         rank=4,
-        mask_path=dict_annot["mask_path"],
+        mask_path=dict_annot["gt_path"],
         bbox=dict_annot["bbox"],
         is_baseline=True,
     )
@@ -182,7 +182,7 @@ for rank in ranks:
             image_name,
             save_path,
             rank=rank,
-            mask_path=dict_annot["mask_path"],
+            mask_path=dict_annot["gt_path"],
             bbox=dict_annot["bbox"],
             is_baseline=False,
         )
@@ -197,7 +197,7 @@ for rank in ranks:
             image_name,
             save_path,
             rank=rank,
-            mask_path=dict_annot["mask_path"],
+            mask_path=dict_annot["gt_path"],
             bbox=dict_annot["bbox"],
             is_baseline=False,
         )

@@ -56,6 +56,8 @@ baseline_loss = 0
 
 # Load SAM model
 with torch.no_grad():
+    # ------------------- Baseline evaluation ------------------- #
+    print("Base model evaluation...")
     sam = build_sam_vit_b(checkpoint=config_file["SAM"]["CHECKPOINT"])
     baseline = sam
     processor = Samprocessor(baseline)
@@ -67,7 +69,7 @@ with torch.no_grad():
         outputs = baseline(batched_input=batch, multimask_output=False)
 
         gt_mask_tensor = (
-            batch[0]["ground_truth_mask"].unsqueeze(0).unsqueeze(0)
+            batch[0]["evaluate_mask"].unsqueeze(0).unsqueeze(0)
         )  # We need to get the [B, C, H, W] starting from [H, W]
         loss = seg_loss(outputs[0]["low_res_logits"], gt_mask_tensor.float().to(device))
 
@@ -84,7 +86,31 @@ with torch.no_grad():
     baseline_loss = mean(total_baseline_loss)
     baseline_auroc = mean(total_baseline_auroc)
 
+    # ------------------- PatchCore evaluation ------------------- #
+    total_uad_auroc = []
+    for i, batch in enumerate(tqdm(test_dataloader)):
+        gt_mask_tensor = batch[0]["evaluate_mask"].unsqueeze(0).unsqueeze(0)
+        uad_mask_tensor = batch[0]["train_mask"].unsqueeze(0).unsqueeze(0)
+        uad_anoamly_map = torch.tensor(batch[0]["anomaly_map"]).unsqueeze(0)
+
+        # Uad interpolate for gt mask size 
+        uad_anoamly_map = F.interpolate(uad_anoamly_map, size=gt_mask_tensor.shape[2:])
+        uad_anoamly_map = uad_anoamly_map.numpy()
+
+        # Calculate AUROC
+        auroc = calculate_auroc_from_logits(
+            gt_mask_tensor.cpu().numpy(), uad_anoamly_map
+        )
+
+        total_uad_auroc.append(auroc)
+    
+    print(f"Mean AUROC score: {mean(total_uad_auroc)}")
+    uad_auroc = mean(total_uad_auroc)
+
+    # ------------------- LoRA evaluation ------------------- #
     for rank in rank_list:
+        print("\n")
+        print(f"Rank {rank} evaluation...")
         sam = build_sam_vit_b(checkpoint=config_file["SAM"]["CHECKPOINT"])
         baseline = sam
 
@@ -112,7 +138,7 @@ with torch.no_grad():
             outputs = model(batched_input=batch, multimask_output=False)
 
             gt_mask_tensor = (
-                batch[0]["ground_truth_mask"].unsqueeze(0).unsqueeze(0)
+                batch[0]["evaluate_mask"].unsqueeze(0).unsqueeze(0)
             )  # We need to get the [B, C, H, W] starting from [H, W]
             loss = seg_loss(
                 outputs[0]["low_res_logits"], gt_mask_tensor.float().to(device)
@@ -127,6 +153,7 @@ with torch.no_grad():
             total_auroc.append(auroc)
 
         print(f"Mean dice score: {mean(total_score)}")
+        print(f"Mean AUROC score: {mean(total_auroc)}")
         rank_loss.append(mean(total_score))
         rank_auroc.append(mean(total_auroc))
 
@@ -174,6 +201,7 @@ width = 0.25  # the width of the bars
 multiplier = 0
 models_auroc_results = {
     "Baseline": baseline_auroc,
+    "UAD": uad_auroc,
     "Rank 4": rank_auroc[0],
     "Rank 8": rank_auroc[1],
     "Rank 16": rank_auroc[2],
@@ -188,7 +216,7 @@ eval_scores_name = ["Rank"]
 x = np.arange(len(eval_scores_name))
 fig, ax = plt.subplots(layout="constrained")
 
-for model_name, score in models_loss_results.items():
+for model_name, score in models_auroc_results.items():
     offset = width * multiplier
     rects = ax.bar(x + offset, score, width, label=model_name)
     ax.bar_label(rects, padding=3)
@@ -199,6 +227,6 @@ ax.set_ylabel("AUROC")
 ax.set_title("LoRA trained on 50 epochs - Rank comparison on test set")
 ax.set_xticks(x + width, eval_scores_name)
 ax.legend(loc=1, ncols=2)
-ax.set_ylim(0, 1)
+ax.set_ylim(0.9, 1.05)
 
 plt.savefig("../results/final_results/rank_auroc_comparison.jpg")
