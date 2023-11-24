@@ -56,7 +56,7 @@ for rank in ranks:
 
     # Process the dataset
     processor = Samprocessor(model)
-    train_ds = DatasetSegmentation(annotations, processor, mode="train", gt_ratio=0.1)
+    train_ds = DatasetSegmentation(annotations, processor, mode="train", gt_ratio=config_file["TRAIN"]["GT_RATIO"])
 
     # Create a dataloader
     train_dataloader = DataLoader(
@@ -73,7 +73,7 @@ for rank in ranks:
     )
     num_epochs = config_file["TRAIN"]["NUM_EPOCHS"]
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = f"cuda:{config_file['TRAIN']['CUDA']}" if torch.cuda.is_available() else "cpu"
 
     # Set model to train and into the device
     model.train()
