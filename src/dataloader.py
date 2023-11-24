@@ -45,10 +45,19 @@ class DatasetSegmentation(Dataset):
         random.seed(random_seed)
         self.img_files, self.evaluate_files, self.train_files = [], [], []
         self.gt_ratio = gt_ratio
-        for img_path, value in annotations[mode].items():
-            self.img_files.append(img_path)
-            self.evaluate_files.append(value["gt_path"])
-            self.train_files.append(value["uad_pred_path"])
+        if mode == "train":
+            modes = ["train"]
+        elif mode == "test":
+            modes = ["test"]
+        elif mode == "all":
+            modes = ["train", "test"]
+
+        # Get the image and mask path
+        for data_mode in modes:
+            for img_path, value in annotations[data_mode].items():
+                self.img_files.append(img_path)
+                self.evaluate_files.append(value["gt_path"])
+                self.train_files.append(value["uad_pred_path"])
 
         # Replace train files with ground truth via gt_ratio
         if (mode == "train") and (gt_ratio > 0):
@@ -59,9 +68,9 @@ class DatasetSegmentation(Dataset):
                 self.train_files[idx] = self.evaluate_files[idx]
 
         # Get the anomaly map of UAD 
-        if mode == "test": 
-            self.uad_anomaly_maps = []
-            for img_path, value in annotations["test"].items():
+        self.uad_anomaly_maps = []
+        for data_mode in modes:     
+            for img_path, value in annotations[data_mode].items():
                 self.uad_anomaly_maps.append(value["uad_pred_path"].replace("images", "anomaly_maps").replace(".png", ".pickle"))
 
         self.processor = processor

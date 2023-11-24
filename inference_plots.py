@@ -34,7 +34,7 @@ annotations = json.load(f)
 
 # Set sam checkpoint
 sam_checkpoint = "../sam_weights/sam_vit_b_01ec64.pth"
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = f"cuda:{config_file['TRAIN']['CUDA']}" if torch.cuda.is_available() else "cpu"
 
 
 def inference_model(
